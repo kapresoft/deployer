@@ -3,60 +3,43 @@ Support Functions
 -------------------------------------------------------------------------------]]
 local sformat, srep = string.format, string.rep
 local tinsert, tconcat = table.insert, table.concat
+local lfs = require("lfs")
+local scriptPath = arg and arg[0]
+local RSYNC_EXCLUDES_FILENAME = 'rsync-excludes.txt'
+local sep = '--------------------'
 
--- block obviously dangerous system paths
-local forbidden = {
-  "/", "/System", "/System/", "/usr", "/usr/", "/bin", "/bin/",
-  "/sbin", "/sbin/", "/etc", "/etc/", "/var", "/var/",
-  "/Applications", "/Applications/"
-}
+local function setupModulePath()
+  local dir = scriptPath:match("(.+)/[^/]+$") or "."
+  package.path = dir .. "/?.lua;" .. dir .. "/?/init.lua;" .. package.path
+end; setupModulePath()
 
-local function dump(t, indent)
-  indent = indent or 0
-  local pad = srep("  ", indent)
+local u = require("util-lib")
+assert(type(u) == 'table', 'Failed to load util library: util-lib.lua')
 
-  for k, v in pairs(t) do
-    if type(v) == "table" then
-      print(pad .. k .. " = {")
-      dump(v, indent + 1)
-      print(pad .. "}")
-    else
-      print(pad .. k .. " = " .. tostring(v))
-    end
+local excludeFile = u:Dirname(scriptPath) .. '/rsync-excludes.txt'
+
+--[[-----------------------------------------------------------------------------
+Start
+-------------------------------------------------------------------------------]]
+--- Validates that a deployment directory is safe and writable
+--- @param dest string
+--- @return boolean, string? @Validation status and the optional error message
+local function ValidateDeployDir(dest)
+  if type(dest) ~= "string" then
+    return false, 'ValidateDeployDir(dest): <dest> should be a string.'
   end
-end
-
---- Formats a table into a single-line comma-separated string.
---- @param t table Table to format
---- @return string CSV formatted string (k=v pairs)
-local function fmt(t)
-  local parts = {}
-  for k, v in pairs(t) do
-    tinsert(parts, k .. "=" .. tostring(v))
+  if u:IsBlank(dest) then
+    return false, ('DeployDir is blank; dir=[%s]'):format(dest)
   end
-  return tconcat(parts, ", ")
-end
 
---- Checks if a string starts with a prefix (case-insensitive).
---- @param str string
---- @param match string
---- @return boolean
-local function startsWith(str, match)
-  if type(str) ~= "string" or type(match) ~= "string" then
-    return false
-  end
-  return str:sub(1, #match):lower() == match:lower()
-end
+  -- normalize (remove trailing slash)
+  dest = u:RemoveTrailingSlash(dest)
 
---- @param path string
---- @return boolean, string?
-local function isReadableFile(path)
-  assert(type(path) == 'string', 'isReadableFile(path): <path> should be a string.')
-  local f, err = io.open(path, "r")
-  if not f then
-    return false, err
+  local isWritable, isWritableErr = u:IsWriteableDir(dest)
+  if not isWritable then
+    return false, ('Dir is not writable; dir=[%s]; msg=[%s]'):format(dest, isWritableErr)
   end
-  f:close()
+
   return true
 end
 
@@ -66,8 +49,8 @@ local INVALID_CONFIG_MSG = '-c or --config requires a path to a deployer config;
 --- @param configPath string The deployer config file
 local function validateConfigPath(configPath)
   assert(type(configPath) == 'string')
-  assert(not startsWith(configPath, '--'), INVALID_CONFIG_MSG)
-  assert(isReadableFile(configPath), INVALID_FILE_MSGF:format(tostring(configPath)))
+  assert(not u:StartsWith(configPath, '--'), INVALID_CONFIG_MSG)
+  assert(u:IsReadableFile(configPath), INVALID_FILE_MSGF:format(tostring(configPath)))
 end
 
 local function printUsage()
@@ -79,6 +62,39 @@ local function printUsage()
   print("         -h|--help           : Show this message")
 end
 
+--- @param conf table
+local function PreVerify(conf)
+  assert(type(conf) == "table", "Invalid config: expected table, but was " .. type(conf))
+
+  assert(conf.addons ~= nil and next(conf.addons) ~= nil,
+    "Invalid config: 'addons' must not be empty")
+
+  assert(conf.deployments ~= nil and next(conf.deployments) ~= nil,
+    "Invalid config: 'deployments' must not be empty")
+
+  for name, addon in pairs(conf.addons) do
+    assert(type(name) == "string" and not u:IsBlank(name),
+      "Invalid addon entry: name is blank")
+
+    assert(type(addon) == "table",
+      ("Invalid addon '%s': expected table"):format(name))
+
+    assert(not u:IsBlank(name),
+      ("Invalid addon '%s': name is blank"):format(name))
+  end
+
+  for name, dep in pairs(conf.deployments) do
+    assert(type(name) == "string" and not u:IsBlank(name),
+      "Invalid deployment entry: name is blank")
+
+    assert(type(dep) == "table",
+      ("Invalid deployment '%s': expected table"):format(name))
+
+    assert(not u:IsBlank(dep.dir),
+      ("Invalid deployment '%s': dir is blank"):format(name))
+  end
+end
+
 --[[-----------------------------------------------------------------------------
 Main
 -------------------------------------------------------------------------------]]
@@ -87,14 +103,12 @@ Main
 --- @field verbose boolean?
 --- @field dryRun boolean?
 --- @field help boolean?
-
+--- @field quiet boolean?
 
 --- @class Deployer
 --- @field config DeploymentConfig
---- @field help boolean?
---- @field verbose boolean?
---- @field dryRun boolean?
 --- @field args DeployerArguments The command line arguments
+--- @field rsyncExcludeFile? string
 --- @field _shortArgs string[]
 --- @field _rsyncFlags string[]
 local o = {}
@@ -108,10 +122,12 @@ function o:__ParseArgs()
   for i = 1, #arg do
     if arg[i] == "-c" or arg[i] == "--config" then
       args.configPath = arg[i + 1]
-    elseif arg[i] == "-n" or arg[i] == "--dry-run" then
-      args.dryRun = true
     elseif arg[i] == "-h" or arg[i] == "--help" then
       args.help = true; return args
+    elseif arg[i] == "-n" or arg[i] == "--dry-run" then
+      args.dryRun = true
+    elseif arg[i] == "-q" or arg[i] == "--quiet" then
+      args.quiet = true
     elseif arg[i] == "-v" or arg[i] == "--verbose" then
       args.verbose = true
     end
@@ -129,19 +145,16 @@ end
 --- @return DeploymentConfig?
 function o:LoadDeploymentConfig()
   local configPath = self.args.configPath
-  if not configPath then
-    printUsage(); return
-  end
-  local chunk, err = loadfile(configPath)
-  if not chunk then
-    print("Error loading config:", err); return
+  if not configPath then printUsage(); return end
+
+  local config = u:LoadConfig(configPath)
+  if not config then return nil end
+
+  local ok, err = pcall(function() PreVerify(config) end)
+  if not ok then
+    print("[ERROR]: Config pre-verification failed\n  •" .. err); return nil
   end
 
-  --- @type boolean, DeploymentConfig
-  local ok, config = pcall(chunk)
-  if not ok then
-    print("Error executing config:", config); return nil
-  end
   return config
 end
 
@@ -159,75 +172,107 @@ function o:ForEachEnabledAddOn(callbackFn)
 end
 
 --- @param callbackFn fun(addOn: ProjectAddOnInfo, deployment:DeploymentTarget) : void
+--- @return number @The number of deployments
 function o:ForEachDeployment(callbackFn)
-  self:ForEachEnabledAddOn(function(addOn)
-    for name, deployment in pairs(self.config.deployments) do
-      deployment.name = name
-      if deployment and deployment.deploy and callbackFn then
+  assertsafe(type(callbackFn) == 'function', 'ForEachDeployment(callbackFn): <callbackFn> should be a function')
+  local count = 0
+  for name, deployment in pairs(self.config.deployments) do
+    deployment.name = name
+    if deployment and deployment.deploy then
+      self:ForEachEnabledAddOn(function(addOn)
+        count = count + 1
         callbackFn(addOn, deployment)
-      end
+      end)
     end
-  end)
+  end
+  return count
 end
 
---- Example: `rsync -rt --delete --prune-empty-dirs --out-format=\ •\ %n\ =\>\ /Applications/wow/_classic_era_/Interface/AddOns/DevSuite/%n --exclude-from=./dev/rsync-excludes.txt`
---- @param src string
---- @param dest string
-function o:rsync(shortArgs, rsyncFlags, src, dest)
-  local cmd = ('rsync -rt%s %s "%s" "%s"'):format(shortArgs, rsyncFlags, src, dest)
-  print('[rsync]: ' .. cmd)
-  --local ok = os.execute(cmd)
-  --assert(ok, 'Rsync command failed: ' .. cmd)
-end
+function o:Exec()
+  local m = 'Exec'
 
---- Checks if a string is nil or only whitespace
---- @param str string?
---- @return boolean
-local function IsBlank(str)
-  if str == nil then return true end
-  return str:match("^%s*$") ~= nil
-end
-
---- Removes a trailing slash from a string (if present)
---- @param str string?
---- @return string?
-local function RemoveTrailingSlash(str)
-  if type(str) ~= "string" then return str end
-  return (str:gsub("/+$", ""))
-end
-
-function o:Main()
   self.args = self:__ParseArgs()
-  if self.help then
-    printUsage(); return
+  if self.args.help then printUsage(); return end
+
+  if not self.args.quiet then
+    printf('%s:: Script: %s', m, scriptPath)
+    printf('%s:: Current-Dir: %s', m, lfs.currentdir())
   end
 
-  self._rsyncFlags = {
-    '--delete', '--prune-empty-dirs'
-  }
+  local excludesFile = ('%s/%s'):format(u:Dirname(scriptPath), RSYNC_EXCLUDES_FILENAME)
+  if u:IsReadableFile(excludesFile) then
+    self.rsyncExcludeFile = excludesFile
+    if not self.args.quiet then
+      printf('%s:: Rsync-Excludes: %s', m, self.rsyncExcludeFile)
+    end
+  end
+  if not self.args.quiet then print() end
+
   self._shortArgs = {}
+  self._rsyncFlags = {
+    '--delete', '--prune-empty-dirs', '--out-format=" • %n => ${dest}/%n"'
+  }
+  if self.args.quiet then tinsert(self._shortArgs, 'q') end
+
   self.config = self:LoadDeploymentConfig()
-  print('args=', fmt(self.args))
+  --print('args=', fmt(self.args))
   if not self.config then return end
-  if self.verbose then tinsert(self._shortArgs, 'v') end
+  if self.args.verbose then tinsert(self._shortArgs, 'v') end
 
   local shortArgs = ''
   local rsyncFlags = ''
   if self.args.dryRun then tinsert(self._rsyncFlags, '--dry-run') end
+  if self.rsyncExcludeFile then  tinsert(self._rsyncFlags, '--exclude-from="' .. self.rsyncExcludeFile .. '"') end
+
   if #self._shortArgs > 0 then shortArgs = tconcat(self._shortArgs) end
   if #self._rsyncFlags > 0 then rsyncFlags = tconcat(self._rsyncFlags, ' ') end
 
-  self:ForEachDeployment(function(addOn, deployment)
-    local src = './' .. addOn.name
+  local count = self:ForEachDeployment(function(addOn, deployment)
     local deployAs = addOn.name
-    local deployDir = RemoveTrailingSlash(deployment.dir)
-    if IsBlank(deployDir) then print('DeployDir is blank'); return end
-    if not IsBlank(addOn.as) then deployAs = addOn.as end
-    deployAs = '/' .. RemoveTrailingSlash(deployAs)
+    local deployDir = u:RemoveTrailingSlash(deployment.dir)
 
-    local dest = deployDir .. deployAs
-    self:rsync(shortArgs, rsyncFlags, src, dest)
+    local validDeployDir, validDeployDirErr = ValidateDeployDir(deployDir)
+    if not validDeployDir then
+      --Users/tony/Desktop/deployer/World of Warcraft/
+      print(m, ('Deploy dir validation failed for addon[%s]:\n'):format(addOn.name),
+          '- ' .. validDeployDirErr);
+      return
+    end
+
+    if not u:IsBlank(addOn.as) then deployAs = addOn.as end
+    deployAs = u:RemoveTrailingSlash(deployAs)
+
+    local src = ("%s/."):format(addOn.name)
+    local dest = ("%s/%s/."):format(deployDir, deployAs)
+
+    self:rsync(src, dest, shortArgs, rsyncFlags, deployDir)
   end)
+  if count <= 0 then
+    printf('%s:: No addons were configured for deployment', m)
+  end
 end
 
-o:Main()
+--- Example: `rsync -rt --delete --prune-empty-dirs --out-format=\ •\ %n\ =\>\ /Applications/wow/_classic_era_/Interface/AddOns/DevSuite/%n --exclude-from=./dev/rsync-excludes.txt`
+--- @param dest string
+--- @param shortArgs string
+--- @param rsyncFlags string
+--- @param deployDir string
+function o:rsync(src, dest, shortArgs, rsyncFlags, deployDir)
+  local m = 'rsync'
+  local cmd = ('rsync -rt%s %s "%s" "%s"'):format(shortArgs, rsyncFlags, src, dest)
+  if not self.args.quiet then
+    printf('%s [%s]::\nCommand: %s\n', ts(), m, cmd)
+  else
+    printf('%s [%s]:: %s => %s', ts(), m, src, dest)
+  end
+  local ok = os.execute(cmd)
+  assertsafe(ok, '%s [%s]:: ERROR\nRsync command failed:\n%s\n', ts(), m, cmd)
+  if not self.args.quiet then
+    print()
+    printf('%s [%s]:: Deploy complete\n  • deployDir=[ %s ]\n  • src=[ %s ]\n  • target=[ %s ]\n%s',
+        ts(), m, deployDir, src, dest, sep)
+  end
+end
+
+o:Exec()
+

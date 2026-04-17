@@ -1,0 +1,35 @@
+# VCS
+.git/
+.github/
+.git*
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*~
+.*
+.DS_Store
+
+# Logs / temp
+*.log
+*.tmp//
+
+# Dev / build artifacts
+dev/
+doc/
+build/
+dist/
+.emmyrc.json
+.release
+*.yaml
+
+# Scripts (if not needed in addon)
+*.sh
+
+# SavedVariables backup (if you use any)
+_SV/
+
+# Optional: test or scratch files
+test/
+*.bak

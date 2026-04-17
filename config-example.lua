@@ -2,20 +2,34 @@
 local c = {
   version = "1.0.0",
   name = "ActionbarPlus",
-  projectDir="~/addons/wow-addon-actionbar-plus",
+  projectDir="/Users/tony/sandbox/github/kapresoft/rel/wow-addon-actionbar-plus",
   addons = {
-    ["ActionbarPlus"]           = { deploy=true },
-    ["ActionbarPlus-Core"]      = { deploy=true },
-    ["ActionbarPlus-BarsUI"]    = { deploy=true },
-    ["ActionbarPlus-OptionsUI"] = { deploy=true },
+    ["ActionbarPlus"]           = {
+      deploy=true,
+      as="ActionbarPlusLegacy"
+    },
+    ["ActionbarPlus-Core"]      = {
+      deploy=true
+    },
+    ["ActionbarPlus-BarsUI"]    = {
+      deploy=false
+    },
+    ["ActionbarPlus-OptionsUI"] = {
+      deploy=false
+    },
   },
+
   deployments = {
-    ["wow-classic"] = {
+    ["test"] = {
       deploy = true,
-      dir="/Applications/World of Warcraft/_classic_/Interface/AddOns"
+      dir="/Users/tony/Desktop/deployer/World of Warcraft"
+    },
+    ["wow-classic"] = {
+      deploy = false,
+      dir=os.getenv("WOW_CLASSIC_HOME")
     },
     ["wow-classic-anniversary"] = {
-      deploy = true,
+      deploy = false,
       dir=os.getenv("WOW_CLASSIC_ANNIV_HOME")
     }
   }
