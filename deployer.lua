@@ -263,10 +263,13 @@ function o:Exec()
       return
     end
 
+    -- an addon whose project dir is the main dir (single-addon)
+    if addOn.name == '.' then deployAs = self.config.name end
     if not u:IsBlank(addOn.as) then deployAs = addOn.as end
     deployAs = u:RemoveTrailingSlash(deployAs)
 
     local src = ("%s/."):format(addOn.name)
+    if addOn.name == '.' then src = "." end
     local dest = ("%s/%s/."):format(deployDir, deployAs)
 
     self:rsync(src, dest, shortArgs, rsyncFlags, deployDir, deployment)
