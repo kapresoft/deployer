@@ -19,7 +19,6 @@
 --- @class DeploymentConfig
 --- @field name string
 --- @field version string
---- @field projectDir FilePath
 --- @field deployments table<string, DeploymentTarget>
 --- @field addons table<string, ProjectAddOnInfo>
 --
