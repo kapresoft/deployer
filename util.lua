@@ -5,6 +5,15 @@ local lfs = require("lfs")
 --[[-----------------------------------------------------------------------------
 Global Functions
 -------------------------------------------------------------------------------]]
+--- @param pathSpec string  @The string format
+--- @param ... string       @The args to a string format
+function path(pathSpec, ...)
+  if type(pathSpec) == 'string' and select('#', ...) > 0 then
+    return pathSpec:format(...);
+  end
+  return nil
+end
+
 --- @param cond boolean
 --- @param msgStringOrFunction string|fun():string  @The string message, the message format string, or function
 --- @param ... any                                  @The args to a string format
@@ -37,9 +46,6 @@ function ts()
   return os.date("%Y-%m-%d %H:%M:%S", sec) .. sformat(".%03d", ms)
 end
 
---[[-----------------------------------------------------------------------------
-Local Functions
--------------------------------------------------------------------------------]]
 local function dump(t, indent)
   indent = indent or 0
   local pad = srep("  ", indent)
@@ -58,7 +64,7 @@ end
 --- Formats a value into a single-line string.
 --- @param t any
 --- @return string
-local function fmt(t)
+function fmt(t)
   local tt = type(t)
 
   if tt ~= "table" then
@@ -81,6 +87,11 @@ local function fmt(t)
   return tconcat(parts, ", ")
 end
 
+--[[-----------------------------------------------------------------------------
+Local Functions
+-------------------------------------------------------------------------------]]
+
+
 
 --[[-----------------------------------------------------------------------------
 Utility Methods
@@ -88,11 +99,39 @@ Utility Methods
 --- @class DeployerUtil
 local o = {}
 
+--- Merges exclude patterns for fswatch
+--- @param excludes string[]
+--- @return string
+function o:mergeExcludes(excludes)
+  assertsafe(self:isArray(excludes), "mergeExcludes(excludes): <excludes> should be a string[]")
+  if excludes[1] == nil then return "" end
+
+  local parts = {}
+  for _, e in ipairs(excludes) do
+    if not self:IsBlank(e) then
+      parts[#parts + 1] = ('-e "%s"'):format(e)
+    end
+  end
+
+  return tconcat(parts, " ")
+end
+
+function o:isArray(t)
+  if type(t) ~= "table" then return false end
+  local n = 0
+  for k, _ in pairs(t) do
+    if type(k) ~= "number" then return false end
+    n = n + 1
+  end
+  return n == #t
+end
+
 --- Checks if a string is nil or only whitespace
 --- @param str string?
 --- @return boolean
 function o:IsBlank(str)
   if str == nil then return true end
+  if type(str) ~= "string" then return false end
   return str:match("^%s*$") ~= nil
 end
 
@@ -118,17 +157,28 @@ end
 function o:IsReadableFile(path)
   assert(type(path) == 'string', 'isReadableFile(path): <path> should be a string.')
   local f, err = io.open(path, "r")
-  if not f then
-    return false, err
-  end
+  if not f then return false, err end
   f:close()
   return true
 end
+
+--- @param path string
+--- @return boolean, string?
+function o:FileExists(path) return self:IsReadableFile(path) end
 
 --- @param path string  @A file path
 --- @return string      @The directory name
 function o:Dirname(path)
   local f = io.popen(('dirname "%s"'):format(path))
+  local result = f:read("*l")
+  f:close()
+  return result
+end
+
+--- @param executable string  @A file path
+--- @return string?      @The value
+function o:Which(executable)
+  local f = io.popen(('command -v "%s" 2>/dev/null'):format(executable))
   local result = f:read("*l")
   f:close()
   return result
