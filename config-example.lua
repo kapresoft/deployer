@@ -1,38 +1,36 @@
+local env = require('user-env')
+--- run with: deployer --config dev/deployer-config.lua -q -n --watch
+
 --- @type DeploymentConfig
 local c = {
   version = "1.0.0",
-  name = "ActionbarPlus",
-  projectDir="/Users/tony/sandbox/github/kapresoft/rel/wow-addon-actionbar-plus",
+  name = "DevSuite",
   addons = {
-    ["ActionbarPlus"]           = {
-      deploy=true,
-      as="ActionbarPlusLegacy"
-    },
-    ["ActionbarPlus-Core"]      = {
+    ["."] = {
       deploy=true
     },
-    ["ActionbarPlus-BarsUI"]    = {
-      deploy=false
-    },
-    ["ActionbarPlus-OptionsUI"] = {
-      deploy=false
-    },
   },
-
   deployments = {
-    ["test"] = {
+    ["classic-era"] = {
+      deploy = false,
+      dir=env.wow.classic_era.addOnDir
+    },
+    ["classic"] = {
+      deploy = false,
+      dir=env.wow.classic.addOnDir
+    },
+    ["classic-anniversary"] = {
       deploy = true,
-      dir="/Users/tony/Desktop/deployer/World of Warcraft"
+      dir=env.wow.classic_anniversary.addOnDir,
     },
-    ["wow-classic"] = {
+    ["retail"] = {
       deploy = false,
-      dir=os.getenv("WOW_CLASSIC_HOME")
+      dir=env.wow.retail.addOnDir,
     },
-    ["wow-classic-anniversary"] = {
+    ["test"] = {
       deploy = false,
-      dir=os.getenv("WOW_CLASSIC_ANNIV_HOME")
-    }
+      dir=path("%s/Desktop/deployer/wow/", env.home)
+    },
   }
 }
-
 return c
