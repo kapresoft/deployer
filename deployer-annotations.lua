@@ -3,7 +3,7 @@
 --
 
 --- @class ProjectAddOnInfo
---- @field name string?       @The addon name (a folder in the project)
+--- @field name string?       @The addon name (a folder in the project) This `"."` for a single-target addon or the addon folder for a multi-addon module.
 --- @field as string?         @Deploy addon as this name
 --- @field deploy boolean?
 --
