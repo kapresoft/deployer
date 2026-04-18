@@ -4,7 +4,15 @@ Support Functions
 local tinsert, tconcat = table.insert, table.concat
 local lfs = require("lfs")
 local scriptPath = arg and arg[0]
+
 local RSYNC_EXCLUDES_FILENAME = 'rsync-excludes.txt'
+
+local WATCH_EXCLUDES = {
+    "\\.(release|idea|github|vscode)/.*", -- hidden dirs
+    "dev/.*", ".*\\.(yaml|yml|sh|md|json|txt)", "_setup\\.*",
+  }
+
+
 local sep = '--------------------'
 
 local function setupModulePath()
@@ -286,10 +294,7 @@ end
 function o:Watch()
   local m = 'Watch'
 
-  local excludes = {
-    "\\.(release|idea|github|vscode)/.*", -- hidden dirs
-    "dev/.*", ".*\\.(yaml|yml|sh|md|json)", "_setup\\.*",
-  }
+  local excludes = WATCH_EXCLUDES
   local executable = 'deployer'
   local execArgs = ReBuildWatchDeployerArgs(self.args)
   local excludesValue = u:mergeExcludes(excludes)
