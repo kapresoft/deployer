@@ -5,11 +5,10 @@ Usage:
 #!/usr/bin/env lua-wow-shebang
 -------------------------------------------------------------------------------]]
 local verbose = false
+local s = '[lua-wow-shebang]:: '
+local function p(...) print(s, ...) end
 
-local s = 'lua-wow-shebang'
-local p = print
-
-if verbose then p(s, 'verbose=', verbose) end
+if verbose then p('verbose=', verbose) end
 
 -- Resolve symlinks and find install directory
 local function resolve(path)
@@ -27,7 +26,8 @@ end
 -- Find our own real location
 local wrapper_source = debug.getinfo(1, "S").source:match("^@(.*)")
 local real_wrapper = resolve(wrapper_source)
-local install_dir = real_wrapper:match("(.*)/")
+local script_dir = real_wrapper:match("(.*)/")
+local install_dir = script_dir:match("(.*)/")
 if verbose then
   p(s, 'wrapper_source=', wrapper_source)
   p(s, 'real_wrapper=', real_wrapper)
@@ -43,12 +43,12 @@ local paths = {
 }
 package.path = table.concat(paths, ";")
 if verbose then
-  p(s, 'package.path=', package.path)
+  p(s .. 'package.path=', package.path)
 end
 -- Run the actual script
 local script = arg[1]
 if not script then
-  p("Usage: lua-setup <script> [args...]")
+  p("Usage: lua-wow-shebang <script> [args...]")
   os.exit(1)
 end
 

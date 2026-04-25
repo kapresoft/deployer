@@ -1,11 +1,11 @@
 local argparse = require("argparse")
 local u = require('util')
 local i, e = u.i, u.e
-local M = {}
+local o = {}
 
-function M.parse(argv)
+function o.parse(argv)
 
-  local parser = argparse("wow-sync-libs", "Run addon setup/build.")
+  local parser = argparse("wow-sync-libs", "Pull required libraries into your WoW addon project")
   parser:option("-v --version", "Build for a specific version."):argname("VERSION")
   parser:flag("-c --clean", "Clean before building")
 
@@ -30,6 +30,6 @@ function M.parse(argv)
   return opts
 end
 
-return M
+return o
 
 

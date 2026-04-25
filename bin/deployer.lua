@@ -63,12 +63,13 @@ local function validateConfigPath(configPath)
 end
 
 local function printUsage()
-  print("Usage: deploy.lua -c <config.lua>")
-  print("  Options:")
-  print("         -c|--config [path]  : The path to the deployer config file")
-  print("         -n|--dry-run [path] : Dry run")
-  print("         -v|--verbose        : Run deployer with additional details")
-  print("         -h|--help           : Show this message")
+  print("Usage: deploy.lua -c <config.lua>\n")
+  print("Deploy WoW addons to your local game installs.\n")
+  print("Options:")
+  print("   -c|--config [path]    The path to the deployer config file")
+  print("   -n|--dry-run [path]   Dry run")
+  print("   -v|--verbose          Run deployer with additional details")
+  print("   -h|--help             Show this message")
 end
 
 --- @param conf table
