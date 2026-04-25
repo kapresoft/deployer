@@ -1,21 +1,63 @@
 # deployer
-A local deployer application for development purpose.
+CLI tools for WoW addon devs: build, sync, and deploy.
 
-# Deployer
+## CLI Tools
+### deployer.lua (w-deploy)
 
-A minimal Lua CLI for deploying World of Warcraft addons with `rsync`.
+Deploy addons to your local WoW install with watch mode —
+automatically detects changes and redeploys instantly.
+
+### sync-libs.lua (w-sync-libs)
+Pull external libraries and dependencies into your WoW addon project.
+
+Reads dev/setup.yaml to fetch required libs from repos and syncs
+them into your local project directory. Must be run from the project root.
 
 ## Prerequisites
 You’ll need the following to run this tool:
 
 - Bash or Zsh shell
-- Lua 5.1+
+- Lua 5.3+
 - rsync (macOS; Homebrew version not tested)
 - fswatch (macOS)
 
-## Usage
+## Installation
+
+Pull down this repository from github
+Can also execute the following command for instructions
+```shell
+./profile-helper
+
+## Output:
+Add this line to your ~/.zshrc file:
+
+eval $(/path/to/deployer/profile-helper.sh -t macos -s)
+
+Then restart your shell or run:
+  source ~/.zshrc
+```
+
+Edit your ~/.zshrc
+Add this line (anywhere)
+
+```shell
+eval $(/path/to/deployer/profile-helper.sh -t macos -s)
+```
+Type `w-helpme`
+Output:
+```shell
+~> w-helpme
+Available WoW Scripts:
+  w-deployer      -> local wow deployer
+  w-sync-libs     -> pull local libs to a wow project
+~>
+```
+
+## Usage: Deployer
 
 Run this from the project folder containing your addon (single or multi-addon).
+
+A minimal Lua CLI for deploying World of Warcraft addons with `rsync`.
 
 ```shell
 $ deployer -c|--config <config.lua> [options]
