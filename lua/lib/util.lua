@@ -2,6 +2,25 @@ local sformat, srep = string.format, string.rep
 local tinsert, tconcat = table.insert, table.concat
 local lfs = require("lfs")
 
+local PREFIX_CHAR_WIDTH = 15
+--[[-----------------------------------------------------------------------------
+Support Functions
+-------------------------------------------------------------------------------]]
+--- Used for log prefixes
+--- @return string @The function name of the caller
+local function get_caller3()
+  local info = debug.getinfo(3, "Sn") -- Level 3 = caller of this function
+  local name = info.name or "anonymous"
+  local file = info.source:match("([^/]+)%.lua$") or "?"
+  local ret = file .. ":" .. name
+  local size = PREFIX_CHAR_WIDTH
+  if #ret > size then
+    ret = ret:sub(1, size - 3) .. "..."
+  end
+  return ret
+end
+
+
 --[[-----------------------------------------------------------------------------
 Global Functions
 -------------------------------------------------------------------------------]]
@@ -39,32 +58,16 @@ function printf(stringOrFormat, ...)
   print(msg)
 end
 
---- @return string
-function ts()
-  local sec = os.time()
-  local ms = math.floor((os.clock() % 1) * 1000)
-  return os.date("%Y-%m-%d %H:%M:%S", sec) .. sformat(".%03d", ms)
-end
-
-local function dump(t, indent)
-  indent = indent or 0
-  local pad = srep("  ", indent)
-
-  for k, v in pairs(t) do
-    if type(v) == "table" then
-      print(pad .. k .. " = {")
-      dump(v, indent + 1)
-      print(pad .. "}")
-    else
-      print(pad .. k .. " = " .. tostring(v))
-    end
-  end
-end
+--[[-----------------------------------------------------------------------------
+Utility Methods
+-------------------------------------------------------------------------------]]
+--- @class DeployerUtil
+local o = {}
 
 --- Formats a value into a single-line string.
 --- @param t any
 --- @return string
-function fmt(t)
+function o.fmt(t)
   local tt = type(t)
 
   if tt ~= "table" then
@@ -87,17 +90,76 @@ function fmt(t)
   return tconcat(parts, ", ")
 end
 
---[[-----------------------------------------------------------------------------
-Local Functions
--------------------------------------------------------------------------------]]
+function o.dump(t, indent)
+  indent = indent or 0
+  local pad = srep("  ", indent)
 
+  for k, v in pairs(t) do
+    if type(v) == "table" then
+      print(pad .. k .. " = {")
+      o.dump(v, indent + 1)
+      print(pad .. "}")
+    else
+      print(pad .. k .. " = " .. tostring(v))
+    end
+  end
+end
 
+--- @return string
+function o.ts()
+  local sec = os.time()
+  local ms = math.floor((os.clock() % 1) * 1000)
+  --return os.date("%Y-%m-%d %H:%M:%S", sec) .. sformat(".%03d", ms)
+  return os.date("%H:%M:%S", sec) .. sformat(".%03d", ms)
+end
 
---[[-----------------------------------------------------------------------------
-Utility Methods
--------------------------------------------------------------------------------]]
---- @class DeployerUtil
-local o = {}
+function echo(...)
+  local args = {}
+  for i = 1, select("#", ...) do
+    args[i] = tostring(select(i, ...))
+  end
+  print(tconcat(args, " "))
+end
+
+function o.p(...)
+  echo("[" .. o.ts() .. "]", ...)
+end
+
+function o.i(...)
+  local prefix = get_caller3()
+  local msg = ""
+  if select("#", ...) > 0 then
+    local args = {}
+    for i = 1, select("#", ...) do
+      args[i] = tostring(select(i, ...))
+    end
+    msg = tconcat(args, " ")
+  end
+  local marginFmt = '%-' .. PREFIX_CHAR_WIDTH .. 's'
+  echo(sformat('[%s] ' .. marginFmt .. ' %s', o.ts(), prefix, msg))
+end
+
+function o.e(...)
+  local prefix = get_caller3()
+  local msg = ""
+  if select("#", ...) > 0 then
+    local args = {}
+    for i = 1, select("#", ...) do
+      args[i] = tostring(select(i, ...))
+    end
+    msg = tconcat(args, " ")
+  end
+  local marginFmt = '%-' .. PREFIX_CHAR_WIDTH .. 's'
+  echo(sformat('[%s] ' .. marginFmt .. ' [ERROR] %s', o.ts(), prefix, msg))
+end
+
+--function o.i3(prefix, ...)
+--  echo("[" .. o.ts() .. "] " .. prefix .. "::", ...)
+--end
+--
+--function o.e2(...)
+--  echo("[" .. o.ts() .. "] ERROR", ...)
+--end
 
 --- Merges exclude patterns for fswatch
 --- @param excludes string[]
@@ -232,7 +294,8 @@ end
 --- @param configPath string @The path to the lua config file
 --- @return table|T      @The loaded config
 function o:LoadConfig(configPath)
-  assertsafe(type(configPath) == 'string', 'Util:LoadConfig(configPath): <configPath> should be a string, but was=%s', tostring(configPath))
+  assertsafe(type(configPath) == 'string', 'Util:LoadConfig(configPath): <configPath> should be a string, but was=%s',
+    tostring(configPath))
 
   local chunk, err = loadfile(configPath)
   if not chunk then

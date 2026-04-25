@@ -1,0 +1,60 @@
+#!/usr/bin/env lua
+--[[-----------------------------------------------------------------------------
+Usage:
+-- place on top of the script
+#!/usr/bin/env lua-wow-shebang
+-------------------------------------------------------------------------------]]
+local verbose = false
+
+local s = 'lua-wow-shebang'
+local p = print
+
+if verbose then p(s, 'verbose=', verbose) end
+
+-- Resolve symlinks and find install directory
+local function resolve(path)
+  local p = path:gsub("'", "'\\''")
+  local f = io.popen("readlink -f '" ..
+  p ..
+  "' 2>/dev/null || realpath '" ..
+  p .. "' 2>/dev/null || python3 -c \"import os; print(os.path.realpath('" .. p .. "'))\" 2>/dev/null || echo '" ..
+  p .. "'")
+  local r = f:read("*a"):gsub("%s+$", "")
+  f:close()
+  return r
+end
+
+-- Find our own real location
+local wrapper_source = debug.getinfo(1, "S").source:match("^@(.*)")
+local real_wrapper = resolve(wrapper_source)
+local install_dir = real_wrapper:match("(.*)/")
+if verbose then
+  p(s, 'wrapper_source=', wrapper_source)
+  p(s, 'real_wrapper=', real_wrapper)
+  p(s, 'install_dir=', install_dir)
+end
+
+-- Set up module paths
+local paths = {
+    install_dir .. "/lua/lib/?.lua",
+    install_dir .. "/lua/?.lua",
+    install_dir .. "/lua/?/init.lua",
+    package.path,
+}
+package.path = table.concat(paths, ";")
+if verbose then
+  p(s, 'package.path=', package.path)
+end
+-- Run the actual script
+local script = arg[1]
+if not script then
+  p("Usage: lua-setup <script> [args...]")
+  os.exit(1)
+end
+
+-- Resolve the script path
+local real_script = resolve(script)
+table.remove(arg, 1) -- Remove script name from args
+
+-- Execute the script
+dofile(real_script)

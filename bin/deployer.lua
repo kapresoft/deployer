@@ -1,3 +1,5 @@
+#!/usr/bin/env lua-wow-shebang
+
 --[[-----------------------------------------------------------------------------
 Support Functions
 -------------------------------------------------------------------------------]]
@@ -22,7 +24,7 @@ end; setupModulePath()
 
 local u = require('util')
 assert(type(u) == 'table', 'Failed to load util library: util-lib.lua')
-
+local ts = u.ts
 local excludeFile = u:Dirname(scriptPath) .. '/rsync-excludes.txt'
 
 --[[-----------------------------------------------------------------------------
