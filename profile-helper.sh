@@ -30,8 +30,8 @@ example_usage() {
 }
 
 # Default values
-verbose=false
-is_shell=false
+verbose=
+is_shell=
 target_os="macos" # Default to macos
 input=""
 
@@ -74,8 +74,11 @@ if [[ -n "$is_shell" ]]; then
     exit 0
 fi
 
-echo "0: $0"
-echo "dirname: $(dirname $0)"
-echo "Add the following at the end of your ~/.[shell rc file] file:"; echo
-echo "eval \$(${helper} -t ${shell_profile_os} -s) && source \${SHELL_PROFILE_SCRIPT}"
+echo "Add this line to your ~/.zshrc file:"
 echo
+echo "eval \$(/path/to/deployer/profile-helper.sh -t macos -s)"
+echo
+echo "Then restart your shell or run:"
+echo "  source ~/.zshrc"
+echo
+
