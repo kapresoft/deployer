@@ -25,7 +25,7 @@ local TEMP_PKGMETA        = "_" .. PKGMETA_FILE
 --[[-----------------------------------------------------------------------------
 Main
 -------------------------------------------------------------------------------]]
-function o.run(argv)
+function o:run(argv)
   -- parse args, call copier/config helpers, etc.
   local opts = cli.parse(argv)
 
@@ -45,13 +45,13 @@ function o.run(argv)
     end
   end
 
-  o.cpTocFile()
-  o.cpPkgmeta(opts)
-  o.runPackager()
-  o.cleanup()
+  self:cpTocFile()
+  self:cpPkgmeta(opts)
+  self:runPackager()
+  self:cleanup()
 end
 
-function o.runPackager()
+function o:runPackager()
   local cmd = ("%s %s -r %q -m %q"):format(
     RELEASE_SCRIPT,
     RELEASE_SCRIPT_ARGS,
@@ -69,7 +69,7 @@ end
 
 --- Copy dev pkgmeta file to temp _setup file
 --- @param opts SyncLibs_CLI_Options
-function o.cpPkgmeta(opts)
+function o:cpPkgmeta(opts)
   local pkgmeta = PKGMETA_FILE
   if opts.version == "2" then
     pkgmeta = ('%sV%s.yml'):format(PKGMETA_NAME, opts.version)
@@ -98,7 +98,7 @@ function o.cpPkgmeta(opts)
   end
 end
 
-function o.cpTocFile()
+function o:cpTocFile()
   local srcToc = './dev/' .. TOC_FILE
 
   if not iou:file_exists(srcToc) then
@@ -116,7 +116,7 @@ function o.cpTocFile()
   i('Executing:', cpCmd)
   local success, msg = iou.execute(cpCmd)
   if not success then
-    u.e(m, 'Failed:', msg)
+    u.e('Failed:', msg)
   end
   if not iou:file_exists(TEMP_TOC) then
     u.e('Failed to copy:', TEMP_TOC)
@@ -124,7 +124,7 @@ function o.cpTocFile()
   end
 end
 
-function o.cleanup()
+function o:cleanup()
   local files = { TEMP_TOC, TEMP_PKGMETA }
   i('Scrubbing Temp Files:', table.concat(files, ', '))
   for _, f in ipairs(files) do
@@ -139,4 +139,9 @@ function o.cleanup()
   i('Scrubbed:', table.concat(files, ', '))
 end
 
-return o
+--[[-----------------------------------------------------------------------------
+Return a new instance for thread safety
+-------------------------------------------------------------------------------]]
+local M = {}
+function M:new() return setmetatable({}, { __index = o }) end
+return M

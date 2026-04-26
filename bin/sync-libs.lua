@@ -1,5 +1,4 @@
 #!/usr/bin/env lua-wow-shebang
 
-local syncLibs = require("sync_libs")
-syncLibs.run(arg)
+require("sync_libs"):new():run(arg)
 

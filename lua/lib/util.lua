@@ -125,6 +125,18 @@ function o.p(...)
   echo("[" .. o.ts() .. "]", ...)
 end
 
+--- @param stringOrFormat string  @The string or string format
+--- @param ... any                @The args to a string format
+function o.pf(stringOrFormat, ...)
+  assertsafe(type(stringOrFormat) == 'string', 'pf(stringOrFormat, ...): <stringOrFormat> must be a string')
+  local msg = stringOrFormat or "non-fatal assertion failed";
+  if type(stringOrFormat) == 'string' and select('#', ...) > 0 then
+    msg = stringOrFormat:format(...);
+  end
+  local marginFmt = '%-' .. PREFIX_CHAR_WIDTH .. 's'
+  print(sformat('[%s] ' .. marginFmt .. ' %s', o.ts(), get_caller3(), msg))
+end
+
 function o.i(...)
   local prefix = get_caller3()
   local msg = ""
