@@ -1,6 +1,6 @@
 # GIVEN: DEPLOYER_HOME from deployer-profile-helper.sh
-alias w-deployer="${DEPLOYER_HOME}/bin/deployer.lua"
-alias w-sync-libs="${DEPLOYER_HOME}/bin/sync-libs.lua"
+alias w-deployer="ALIAS_NAME=w-deployer ${DEPLOYER_HOME}/bin/deployer.lua"
+alias w-sync-libs="ALIAS_NAME=w-sync-libs ${DEPLOYER_HOME}/bin/sync-libs.lua"
 alias w-helpme=_w_helpme
 
 _w_helpme() {

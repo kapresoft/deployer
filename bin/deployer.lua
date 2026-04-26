@@ -8,12 +8,13 @@ local lfs = require("lfs")
 local scriptPath = arg and arg[0]
 
 local RSYNC_EXCLUDES_FILENAME = 'rsync-excludes.txt'
+local RSYNC_EXCLUDES_FILE = ('%s/%s'):format(deployerHome(), RSYNC_EXCLUDES_FILENAME)
+local PROJ_RSYNC_EXCLUDES_FILE = ('./dev/%s'):format(RSYNC_EXCLUDES_FILENAME)
 
 local WATCH_EXCLUDES = {
     "\\.(release|idea|github|vscode)/.*", -- hidden dirs
     "dev/.*", ".*\\.(yaml|yml|sh|md|json|txt)", "_setup\\.*",
-  }
-
+}
 
 local sep = '--------------------'
 
@@ -228,12 +229,23 @@ function o:Exec()
     printf('%s:: Current-Dir: %s', m, lfs.currentdir())
   end
 
-  local excludesFile = ('%s/%s'):format(u:Dirname(scriptPath), RSYNC_EXCLUDES_FILENAME)
-  if u:IsReadableFile(excludesFile) then
-    self.rsyncExcludeFile = excludesFile
+  -- order of search: rsync excludes file
+  -- 1) local
+  -- 2) install dir
+
+  if u:IsReadableFile(PROJ_RSYNC_EXCLUDES_FILE) then
+    self.rsyncExcludeFile = PROJ_RSYNC_EXCLUDES_FILE
     if not self.args.quiet then
-      printf('%s:: Rsync-Excludes: %s', m, self.rsyncExcludeFile)
+      printf('%s:: Using project rsync excludes file: %s', m, PROJ_RSYNC_EXCLUDES_FILE)
     end
+  elseif u:IsReadableFile(RSYNC_EXCLUDES_FILE) then
+    self.rsyncExcludeFile = RSYNC_EXCLUDES_FILE
+    if not self.args.quiet then
+      printf('%s:: Using rsync excludes file: %s', m, self.rsyncExcludeFile)
+    end
+  else
+    printf('%s:: Rsync-Excludes not found: %s', m, self.rsyncExcludeFile)
+    os.exit(1)
   end
   if not self.args.quiet then print() end
 

@@ -6,6 +6,7 @@ local iou = require('io-util')
 local p, i = u.p, u.i
 
 local DEPLOYER_HOME = os.getenv('DEPLOYER_HOME')
+local ALIAS_NAME = os.getenv('ALIAS_NAME')
 
 --[[-----------------------------------------------------------------------------
 Local Vars
@@ -19,7 +20,7 @@ local TOC_FILE            = ("%s.toc"):format(PKGMETA_NAME)
 local SETUP_TOC           = ("%s/misc/%s.toc"):format(DEPLOYER_HOME, PKGMETA_NAME)
 local PKGMETA_FILE        = ("%s.yml"):format(PKGMETA_NAME)
 local TEMP_TOC            = "_" .. TOC_FILE
-local TEMP_PKGMETA = "_" .. PKGMETA_FILE
+local TEMP_PKGMETA        = "_" .. PKGMETA_FILE
 
 --[[-----------------------------------------------------------------------------
 Main
@@ -27,6 +28,11 @@ Main
 function o.run(argv)
   -- parse args, call copier/config helpers, etc.
   local opts = cli.parse(argv)
+
+  if opts.verbose then
+    p('DEPLOYER_HOME=', DEPLOYER_HOME)
+    p('ALIAS_NAME=', ALIAS_NAME)
+  end
 
   if opts.clean then
     local relDir = './.release'
@@ -64,7 +70,6 @@ end
 --- Copy dev pkgmeta file to temp _setup file
 --- @param opts SyncLibs_CLI_Options
 function o.cpPkgmeta(opts)
-
   local pkgmeta = PKGMETA_FILE
   if opts.version == "2" then
     pkgmeta = ('%sV%s.yml'):format(PKGMETA_NAME, opts.version)
