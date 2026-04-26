@@ -4,35 +4,62 @@ Usage:
 -- place on top of the script
 #!/usr/bin/env lua-wow-shebang
 -------------------------------------------------------------------------------]]
-local verbose = false
-local s = '[lua-wow-shebang]:: '
-local function p(...) print(s, ...) end
 
+local s = '[lua-wow-shebang]:: '
+local verbose = false
+local function p(...) print(s, ...) end
 if verbose then p('verbose=', verbose) end
 
--- Resolve symlinks and find install directory
-local function resolve(path)
-  local p = path:gsub("'", "'\\''")
-  local f = io.popen("readlink -f '" ..
-  p ..
-  "' 2>/dev/null || realpath '" ..
-  p .. "' 2>/dev/null || python3 -c \"import os; print(os.path.realpath('" .. p .. "'))\" 2>/dev/null || echo '" ..
-  p .. "'")
-  local r = f:read("*a"):gsub("%s+$", "")
-  f:close()
-  return r
+local function shell_exec(cmd)
+    local f = io.popen(cmd .. " 2>/dev/null")
+    if not f then return nil end
+    local result = f:read("*a"):gsub("^%s+", ""):gsub("%s+$", "")
+    local success = f:close()
+    if success and result ~= "" then return result end
+    return nil
 end
 
--- Find our own real location
-local wrapper_source = debug.getinfo(1, "S").source:match("^@(.*)")
-local real_wrapper = resolve(wrapper_source)
-local script_dir = real_wrapper:match("(.*)/")
-local install_dir = script_dir:match("(.*)/")
-if verbose then
-  p(s, 'wrapper_source=', wrapper_source)
-  p(s, 'real_wrapper=', real_wrapper)
-  p(s, 'install_dir=', install_dir)
+local function resolve(path)
+    local safe = path:gsub("'", "'\\''")
+
+    -- macOS: readlink -f works on recent versions
+    -- Linux: readlink -f is standard (GNU coreutils)
+    local result = shell_exec("readlink -f '" .. safe .. "'")
+    if result then return result end
+
+    -- macOS fallback: realpath available on some versions
+    -- Linux fallback: realpath from GNU coreutils
+    result = shell_exec("realpath '" .. safe .. "'")
+    if result then return result end
+
+    -- Python fallback: available on macOS and most Linux distros
+    result = shell_exec("python3 -c 'import os; print(os.path.realpath(\"" .. safe .. "\"))'")
+    if result then return result end
+
+    -- Perl fallback: universally available
+    result = shell_exec("perl -MCwd=realpath -e 'print realpath(shift)' '" .. safe .. "'")
+    if result then return result end
+
+    -- Last resort: return original path
+    return path
 end
+
+--- @return string
+local function getInstallDir()
+  -- Resolve the install_dir: {install_dir}/shebang/lua-wow-shebang
+  local wrapper_source = debug.getinfo(1, "S").source:match("^@(.*)")
+  local real_wrapper = resolve(wrapper_source)
+  local install_dir = real_wrapper:match("(.*)/"):match("(.*)/")
+  if verbose then
+    p(s, 'wrapper_source=', wrapper_source)
+    p(s, 'real_wrapper=', real_wrapper)
+    p(s, 'install_dir=', install_dir)
+  end
+  return install_dir
+end
+
+local install_dir = getInstallDir()
+if not install_dir then return end
 
 -- Set up module paths
 local paths = {
@@ -41,11 +68,13 @@ local paths = {
     install_dir .. "/lua/?/init.lua",
     package.path,
 }
+
 package.path = table.concat(paths, ";")
+
 if verbose then
-  p(s .. 'package.path=', package.path)
+  p(s, 'package.path=', package.path)
 end
--- Run the actual script
+
 local script = arg[1]
 if not script then
   p("Usage: lua-wow-shebang <script> [args...]")

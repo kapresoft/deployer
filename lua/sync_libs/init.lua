@@ -5,6 +5,8 @@ local cli = require("sync_libs.cli")
 local iou = require('io-util')
 local p, i = u.p, u.i
 
+local DEPLOYER_HOME = os.getenv('DEPLOYER_HOME')
+
 --[[-----------------------------------------------------------------------------
 Local Vars
 -------------------------------------------------------------------------------]]
@@ -14,8 +16,9 @@ local BUILD_DIR           = './.release'
 
 local PKGMETA_NAME        = "setup"
 local TOC_FILE            = ("%s.toc"):format(PKGMETA_NAME)
+local SETUP_TOC           = ("%s/misc/%s.toc"):format(DEPLOYER_HOME, PKGMETA_NAME)
 local PKGMETA_FILE        = ("%s.yml"):format(PKGMETA_NAME)
-local TEMP_TOC = "_" .. TOC_FILE
+local TEMP_TOC            = "_" .. TOC_FILE
 local TEMP_PKGMETA = "_" .. PKGMETA_FILE
 
 --[[-----------------------------------------------------------------------------
@@ -94,9 +97,15 @@ function o.cpTocFile()
   local srcToc = './dev/' .. TOC_FILE
 
   if not iou:file_exists(srcToc) then
-    u.e('Missing:', srcToc)
-    return
+    if iou:file_exists(SETUP_TOC) then
+      srcToc = SETUP_TOC
+    end
   end
+  if not iou:file_exists(srcToc) then
+    u.e('Could not find an available setup.toc file')
+    os.exit(1)
+  end
+  i('Using toc:', srcToc)
 
   local cpCmd = ('cp %q %q'):format(srcToc, TEMP_TOC)
   i('Executing:', cpCmd)
