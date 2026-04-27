@@ -10,7 +10,7 @@ Support Functions
 --- @return string @The function name of the caller
 local function get_caller3()
   local info = debug.getinfo(3, "Sn") -- Level 3 = caller of this function
-  local name = info.name or "anonymous"
+  local name = info.name or ""
   local file = info.source:match("([^/]+)%.lua$") or "?"
   local ret = file .. ":" .. name
   local size = PREFIX_CHAR_WIDTH
@@ -63,6 +63,25 @@ Utility Methods
 -------------------------------------------------------------------------------]]
 --- @class DeployerUtil
 local o = {}
+
+--- Used for log prefixes
+--- @param level? number @Caller Level 1 or above
+--- @return string @The function name of the caller
+function o.caller(level)
+  if level then
+    assert(type(level) == 'number', 'o.caller(level): {level} must be a number')
+    assert(level >= 1, 'o.caller(level): {level} must be 1 level or above')
+  end
+  local info = debug.getinfo(level, "Sn") -- Level N = caller of this function
+  local name = info.name or ""
+  local file = info.source:match("([^/]+)%.lua$") or "?"
+  local ret = file .. ":" .. name
+  local size = PREFIX_CHAR_WIDTH
+  if #ret > size then
+    ret = ret:sub(1, size - 3) .. "..."
+  end
+  return ret
+end
 
 --- Formats a value into a single-line string.
 --- @param t any
@@ -137,6 +156,20 @@ function o.pf(stringOrFormat, ...)
   print(sformat('[%s] ' .. marginFmt .. ' %s', o.ts(), get_caller3(), msg))
 end
 
+--- @param callerLvl string @The name of the caller
+--- @param stringOrFormat string  @The string or string format
+--- @param ... any                @The args to a string format
+function o.pff(callerLvl, stringOrFormat, ...)
+  assertsafe(type(stringOrFormat) == 'string', 'pf(stringOrFormat, ...): <stringOrFormat> must be a string')
+  local msg = stringOrFormat or "non-fatal assertion failed";
+  if type(stringOrFormat) == 'string' and select('#', ...) > 0 then
+    msg = stringOrFormat:format(...);
+  end
+  local c = o.caller(callerLvl)
+  local marginFmt = '%-' .. PREFIX_CHAR_WIDTH .. 's'
+  print(sformat('[%s] ' .. marginFmt .. ' %s', o.ts(), c, msg))
+end
+
 function o.i(...)
   local prefix = get_caller3()
   local msg = ""
@@ -163,6 +196,18 @@ function o.e(...)
   end
   local marginFmt = '%-' .. PREFIX_CHAR_WIDTH .. 's'
   echo(sformat('[%s] ' .. marginFmt .. ' [ERROR] %s', o.ts(), prefix, msg))
+end
+
+--- @return UserProperties
+--- @return path @The path to the file
+function o.try_require_user_props()
+  local path = deployerHome() .. "/user-properties.lua"
+  local f = io.open(path)
+  if f then
+    f:close()
+    return dofile(path), path
+  end
+  return nil   -- optional file not found
 end
 
 --function o.i3(prefix, ...)
@@ -239,6 +284,13 @@ end
 --- @param path string
 --- @return boolean, string?
 function o:FileExists(path) return self:IsReadableFile(path) end
+
+--- @param path string
+--- @return boolean
+function o:DirExists(path)
+  local attr = lfs.attributes(path)
+  return attr ~= nil and attr.mode == "directory"
+end
 
 --- @param path string  @A file path
 --- @return string      @The directory name

@@ -1,4 +1,5 @@
 --- @alias FilePath string
+--- @alias DirPath string
 --
 --
 
@@ -23,3 +24,7 @@
 --- @field addons table<string, ProjectAddOnInfo>
 --
 --
+
+--
+--- @class UserProperties
+--- @field WOW_INSTALL DirPath

@@ -31,6 +31,8 @@ luac.out
 *.so.*
 *.dylib
 
+user-properties.lua
+
 # Executables
 *.exe
 *.out
