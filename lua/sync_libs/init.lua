@@ -6,7 +6,7 @@ local iou = require('io-util')
 local p, i = u.p, u.i
 
 local DEPLOYER_HOME = os.getenv('DEPLOYER_HOME')
-local ALIAS_NAME = os.getenv('ALIAS_NAME')
+local INVOKED_AS = os.getenv('INVOKED_AS')
 
 --[[-----------------------------------------------------------------------------
 Local Vars
@@ -31,7 +31,7 @@ function o:run(argv)
 
   if opts.verbose then
     p('DEPLOYER_HOME=', DEPLOYER_HOME)
-    p('ALIAS_NAME=', ALIAS_NAME)
+    p('INVOKED_AS=', INVOKED_AS)
   end
 
   if opts.clean then

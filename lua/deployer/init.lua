@@ -3,7 +3,7 @@ Lua Vars
 -------------------------------------------------------------------------------]]
 local u = require('util')
 local ts = u.ts
-local cli = require("sync_libs.cli")
+local cli = require("deployer.cli")
 local iou = require('io-util')
 local p, i = u.p, u.i
 
@@ -160,9 +160,10 @@ function o:__ParseArgs(arg)
   return opts
 end
 
+--- @param opts DeployCLI_Options
 --- @return DeploymentConfig?
-function o:LoadDeploymentConfig()
-  local configPath = self.args.configPath
+function o:LoadDeploymentConfig(opts)
+  local configPath = opts.config
   if not configPath then
     printUsage(); return
   end
@@ -208,17 +209,17 @@ function o:ForEachDeployment(callbackFn)
   return count
 end
 
---- @param args DeployerArguments
+--- @param opts DeployCLI_Options
 --- @return string
-local function ReBuildWatchDeployerArgs(args)
-  local execArgsArr = { '-c ' .. args.configPath }
-  if args.verbose == true then
+local function ReBuildWatchDeployerArgs(opts)
+  local execArgsArr = { '-c ' .. opts.config }
+  if opts.verbose then
     tinsert(execArgsArr, '-v')
   end
-  if args.quiet == true then
+  if opts.quiet then
     tinsert(execArgsArr, '-q')
   end
-  if args.dryRun == true then
+  if opts.dry_run then
     tinsert(execArgsArr, '-n')
   end
   return tconcat(execArgsArr, ' ')
@@ -228,13 +229,14 @@ end
 function o:run(arg)
   local m = 'run'
 
+  local opts = cli.parse(argv)
   self.args = self:__ParseArgs(arg)
-  if self.args.help then
-    printUsage(); return
-  end
+  --if opts.help then
+  --  printUsage(); return
+  --end
 
-  if not self.args.quiet then
-    if self.args.dryRun then u.pf('DryRun: %s', self.args.dryRun) end
+  if not opts.quiet then
+    if opts.dry_run then u.pf('DryRun: %s', opts.dry_run) end
     u.pf('Script: %s', scriptPath)
     u.pf('Current-Dir: %s', lfs.currentdir())
   end
@@ -243,46 +245,43 @@ function o:run(arg)
   -- 1) local
   -- 2) install dir
 
+  local rsyncExcludesFile
   if u:IsReadableFile(PROJ_RSYNC_EXCLUDES_FILE) then
-    self.rsyncExcludeFile = PROJ_RSYNC_EXCLUDES_FILE
-    if not self.args.quiet then
-      printf('%s:: Using project rsync excludes file: %s', m, self.rsyncExcludeFile)
+    rsyncExcludesFile = PROJ_RSYNC_EXCLUDES_FILE
+    if not opts.quiet then
+      printf('%s:: Using project rsync excludes file: %s', m, rsyncExcludesFile)
     end
   elseif u:IsReadableFile(RSYNC_EXCLUDES_FILE) then
-    self.rsyncExcludeFile = RSYNC_EXCLUDES_FILE
-    if not self.args.quiet then
-      printf('%s:: Using rsync excludes file: %s', m, self.rsyncExcludeFile)
+    rsyncExcludesFile = RSYNC_EXCLUDES_FILE
+    if not opts.quiet then
+      printf('%s:: Using rsync excludes file: %s', m, rsyncExcludesFile)
     end
   else
     printf('%s:: Rsync-Excludes not found: %s', m, RSYNC_EXCLUDES_FILE)
     os.exit(1)
   end
-  if not self.args.quiet then print() end
+  if not opts.quiet then print() end
 
-  self._shortArgs = {}
-  self._rsyncFlags = {
+  local shortArgsArr = {}
+  local rsyncFlagsArr = {
     '--delete', '--prune-empty-dirs',
     '--out-format=" • %n => ${dest}/%n"'
   }
-  if self.args.quiet then tinsert(self._shortArgs, 'q') end
+  if opts.quiet then tinsert(shortArgsArr, 'q') end
 
-  self.config = self:LoadDeploymentConfig()
+  self.config = self:LoadDeploymentConfig(opts)
   if not self.config then return end
-  if self.args.verbose then tinsert(self._shortArgs, 'v') end
+  if opts.verbose then tinsert(shortArgsArr, 'v') end
 
   local shortArgs = ''
   local rsyncFlags = ''
-  if self.args.dryRun then tinsert(self._rsyncFlags, '--dry-run') end
-  if self.rsyncExcludeFile then tinsert(self._rsyncFlags, '--exclude-from="' .. self.rsyncExcludeFile .. '"') end
+  if opts.dry_run then tinsert(rsyncFlagsArr, '--dry-run') end
+  if rsyncExcludesFile then tinsert(rsyncFlagsArr, '--exclude-from="' .. rsyncExcludesFile .. '"') end
 
-  if #self._shortArgs > 0 then
-    shortArgs = tconcat(self._shortArgs)
-    self.shortArgs = shortArgs
+  if #shortArgsArr > 0 then
+    shortArgs = tconcat(shortArgsArr)
   end
-  if #self._rsyncFlags > 0 then
-    rsyncFlags = tconcat(self._rsyncFlags, ' ')
-    self.rsyncFlags = rsyncFlags
-  end
+  if #rsyncFlagsArr > 0 then rsyncFlags = tconcat(rsyncFlagsArr, ' ') end
 
   local count = self:ForEachDeployment(function(addOn, deployment)
     local deployAs = addOn.name
@@ -304,7 +303,7 @@ function o:run(arg)
     if addOn.name == '.' then src = "." end
     local dest = ("%s/%s/."):format(deployDir, deployAs)
 
-    self:rsync(src, dest, shortArgs, rsyncFlags, deployDir, deployment)
+    self:rsync(opts, src, dest, shortArgs, rsyncFlags, deployDir, deployment)
   end)
   if count <= 0 then
     printf('%s:: No addons were configured for deployment', m)
@@ -312,18 +311,22 @@ function o:run(arg)
   else
     print()
   end
-  if self.args.watch then self:Watch() end
+  if opts.watch then self:Watch(opts) end
 end
 
-function o:Watch()
+--- @param opts DeployCLI_Options
+function o:Watch(opts)
   local m = 'Watch'
 
   local excludes = WATCH_EXCLUDES
-  local executable = 'deployer'
-  local execArgs = ReBuildWatchDeployerArgs(self.args)
+  local execArgs = ReBuildWatchDeployerArgs(opts)
   local excludesValue = u:mergeExcludes(excludes)
-  local cmd = ('fswatch -IE -o -l 0.2 %s .| xargs -n1 -I{} "%s" %s'):format(
-    excludesValue, executable, execArgs
+  local invoker = "'$DEPLOYER_HOME/bin/deployer.lua'"
+  --local cmd = ('fswatch -IE -o -l 0.2 %s .| xargs -n1 -I{} zsh -c "setopt aliases && alias w-deployer=$DEPLOYER_HOME/bin/deployer.lua; which w-deployer; eval \'%s %s\'"'):format(
+  --  excludesValue, invokedAs(), execArgs
+  --)
+  local cmd = ('fswatch -IE -o -l 0.2 %s .| xargs -n1 -I{} zsh -c ". $DEPLOYER_HOME/deployer.zshrc && %s %s"'):format(
+    excludesValue, invokedAs(), execArgs
   )
   local fswatch = u:Which('fswatch')
   printf('%s:: Running in watch mode; fswatch=%s', m, fswatch)
@@ -332,23 +335,24 @@ function o:Watch()
 end
 
 --- Example: `rsync -rt --delete --prune-empty-dirs --out-format=\ •\ %n\ =\>\ /Applications/wow/_classic_era_/Interface/AddOns/DevSuite/%n --exclude-from=./dev/rsync-excludes.txt`
+--- @param opts DeployCLI_Options
 --- @param dest string
 --- @param shortArgs string
 --- @param rsyncFlags string
 --- @param deployDir string
 --- @param deployment DeploymentTarget
-function o:rsync(src, dest, shortArgs, rsyncFlags, deployDir, deployment)
+function o:rsync(opts, src, dest, shortArgs, rsyncFlags, deployDir, deployment)
   local m = 'rsync'
   local cmd = ('rsync -rt%s %s "%s" "%s"'):format(shortArgs, rsyncFlags, src, dest)
-  if not self.args.quiet then
+  if not opts.quiet then
     printf('%s [%s]::\nCommand: %s\n', ts(), m, cmd)
   else
     printf('%s [%s:%s]:: %s => %s', ts(), m, deployment.name, src, deployDir)
   end
   local ok = os.execute(cmd)
   assertsafe(ok, '%s [%s]:: ERROR\nRsync command failed:\n%s\n', ts(), m, cmd)
-  if not self.args.quiet then
-    if self.args.watch then print() end
+  if not opts.quiet then
+    if opts.watch then print() end
     printf('%s [%s:%s]:: Deploy complete\n  • deployDir=[ %s ]\n  • src=[ %s ]\n  • target=[ %s ]\n%s',
       ts(), m, deployment.name, deployDir, src, dest, sep)
   end
@@ -359,4 +363,5 @@ Return a new instance for thread safety
 -------------------------------------------------------------------------------]]
 local M = {}
 function M:new() return setmetatable({}, { __index = o }) end
+
 return M

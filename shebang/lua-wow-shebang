@@ -10,7 +10,7 @@ local verbose = false
 Global Functions
 -------------------------------------------------------------------------------]]
 function deployerHome() return os.getenv('DEPLOYER_HOME') end
-function invokedAs() return os.getenv('ALIAS_NAME') end
+function invokedAs() return os.getenv('INVOKED_AS') end
 
 --[[-----------------------------------------------------------------------------
 Start

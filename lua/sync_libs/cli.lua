@@ -4,7 +4,12 @@ local i, e = u.i, u.e
 local o = {}
 
 function o.parse(argv)
-  local parser = argparse(invokedAs(), "Pull required libraries into your WoW addon project")
+  local cmd_name = invokedAs()
+  if not cmd_name then
+    e('sync_libs/cli:: Could not detect command name (invokedAs() not set)')
+    os.exit(1)
+  end
+  local parser = argparse(cmd_name, "Pull required libraries into your WoW addon project")
   parser:option("-v --version", "Build for a specific version."):argname("VERSION")
   parser:flag("-c --clean", "Clean before building")
   parser:flag("--verbose", "Run in verbose mode")
@@ -28,5 +33,3 @@ function o.parse(argv)
 end
 
 return o
-
-
