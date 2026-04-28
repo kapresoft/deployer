@@ -1,3 +1,5 @@
+-- set this to true in deployer configs for verbose output
+-- USER_ENV_VERBOSE=true
 local u = require('util')
 -- user-properties.lua is optional and is in .gitignore
 local user_props, user_props_path = u.try_require_user_props()
@@ -12,8 +14,10 @@ Main
 
 if (user_props and user_props.WOW_INSTALL )then
   INSTALL_DIR = user_props.WOW_INSTALL
-  i('UserProperties found at:', user_props_path)
-  i('Using WoW INSTALL_DIR from user-properties.lua:', INSTALL_DIR)
+  if USER_ENV_VERBOSE then
+    pf('UserProperties: %s [V]', user_props_path)
+    pf('Using WoW INSTALL_DIR from user-properties.lua: %s [V]', INSTALL_DIR)
+  end
   if not u:DirExists(INSTALL_DIR) then
     e('WoW INSTALL_DIR does not exist:', INSTALL_DIR)
     os.exit(1)

@@ -1,6 +1,7 @@
 local sformat, srep = string.format, string.rep
 local tinsert, tconcat = table.insert, table.concat
 local lfs = require("lfs")
+local DIR_SEP = package.config:sub(1,1)
 
 local PREFIX_CHAR_WIDTH = 15
 --[[-----------------------------------------------------------------------------
@@ -299,6 +300,16 @@ function o:Dirname(path)
   local result = f:read("*l")
   f:close()
   return result
+end
+
+--- Resolve the actual name of the PWD
+--- @param dotPath string @The dot path, i.e. `.` or `./Path`
+function o:CurrentDirname(dotPath)
+    dotPath = type(dotPath) == 'string' and dotPath or '.'
+    local handle = io.popen("cd " .. dotPath .. " && pwd")
+    local cwd = handle:read("*line")
+    handle:close()
+    return cwd:match("[^" .. DIR_SEP .. "]+$") -- last path of the dir name
 end
 
 --- @param executable string  @A file path

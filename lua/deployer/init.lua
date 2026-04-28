@@ -5,7 +5,7 @@ local u = require('util')
 local ts = u.ts
 local cli = require("deployer.cli")
 local iou = require('io-util')
-local p, i = u.p, u.i
+local p, pf, i = u.p, u.pf, u.i
 
 --[[-----------------------------------------------------------------------------
 DeployerMain
@@ -16,6 +16,7 @@ DeployerMain
 --- @field rsyncExcludeFile? string
 --- @field _shortArgs string[]
 --- @field _rsyncFlags string[]
+--- @field _printOnce boolean
 local o = {}
 
 --[[-----------------------------------------------------------------------------
@@ -308,9 +309,9 @@ function o:run(arg)
   if count <= 0 then
     printf('%s:: No addons were configured for deployment', m)
     return
-  else
-    print()
   end
+  if not opts.is_watching then print() end
+  pf('Deploy complete', opts.is_watching)
   if opts.watch then self:Watch(opts) end
 end
 
@@ -319,7 +320,7 @@ function o:Watch(opts)
   local m = 'Watch'
 
   local excludes = WATCH_EXCLUDES
-  local execArgs = ReBuildWatchDeployerArgs(opts)
+  local execArgs = ReBuildWatchDeployerArgs(opts) .. ' --is_watching'
   local excludesValue = u:mergeExcludes(excludes)
   local invoker = "'$DEPLOYER_HOME/bin/deployer.lua'"
   --local cmd = ('fswatch -IE -o -l 0.2 %s .| xargs -n1 -I{} zsh -c "setopt aliases && alias w-deployer=$DEPLOYER_HOME/bin/deployer.lua; which w-deployer; eval \'%s %s\'"'):format(
@@ -329,8 +330,8 @@ function o:Watch(opts)
     excludesValue, invokedAs(), execArgs
   )
   local fswatch = u:Which('fswatch')
-  printf('%s:: Running in watch mode; fswatch=%s', m, fswatch)
-  printf('%s:: Command: %s', m, cmd)
+  pf('Running in watch mode; fswatch=%s', fswatch)
+  pf('Command: %s\n', cmd)
   os.execute(cmd)
 end
 
@@ -344,18 +345,14 @@ end
 function o:rsync(opts, src, dest, shortArgs, rsyncFlags, deployDir, deployment)
   local m = 'rsync'
   local cmd = ('rsync -rt%s %s "%s" "%s"'):format(shortArgs, rsyncFlags, src, dest)
+  local dirname = u:CurrentDirname(src)
   if not opts.quiet then
-    printf('%s [%s]::\nCommand: %s\n', ts(), m, cmd)
-  else
-    printf('%s [%s:%s]:: %s => %s', ts(), m, deployment.name, src, deployDir)
+    pf('%s\n', cmd)
+  elseif not opts.is_watching then
+    pf('%s => %s', dirname, deployDir)
   end
   local ok = os.execute(cmd)
   assertsafe(ok, '%s [%s]:: ERROR\nRsync command failed:\n%s\n', ts(), m, cmd)
-  if not opts.quiet then
-    if opts.watch then print() end
-    printf('%s [%s:%s]:: Deploy complete\n  • deployDir=[ %s ]\n  • src=[ %s ]\n  • target=[ %s ]\n%s',
-      ts(), m, deployment.name, deployDir, src, dest, sep)
-  end
 end
 
 --[[-----------------------------------------------------------------------------

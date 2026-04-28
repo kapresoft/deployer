@@ -15,6 +15,9 @@ function o.parse(argv)
   parser:flag("-q --quiet", "Run in quiet mode")
   parser:flag("-n --dry-run", "Dry run mode (simulate deployment)")
   parser:flag("-v --verbose", "Run in verbose mode")
+  parser:flag("--is_watching")
+      :description("Internal use to indicate it is watching")
+      :hidden(true)
 
   --- @class DeployCLI_Options
   --- @field config string    @The path to the deployer config file
@@ -22,9 +25,12 @@ function o.parse(argv)
   --- @field watch boolean?   @Deploy and watch for changes
   --- @field verbose? boolean @Run with more details
   --- @field dry_run? boolean  @Dry run mode (simulate deployment)
+  --- @field is_watching? boolean  @Internal use to indicate in watch mode
   local opts = parser:parse(argv)
 
-  u.pf('opts= %s', u.fmt(opts))
+  if not opts.quiet then
+    u.pf('opts= %s', u.fmt(opts))
+  end
 
   return opts
 end
