@@ -23,6 +23,8 @@ dist/
 .emmyrc.json
 .release
 *.yaml
+*.md
+Dev.toc
 
 # Scripts (if not needed in addon)
 *.sh

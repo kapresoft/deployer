@@ -265,7 +265,7 @@ function o:run(arg)
 
   local shortArgsArr = {}
   local rsyncFlagsArr = {
-    '--delete', '--prune-empty-dirs',
+    '--delete', '--delete-excluded', '--prune-empty-dirs',
     '--out-format=" • %n => ${dest}/%n"'
   }
   if opts.quiet then tinsert(shortArgsArr, 'q') end
@@ -335,7 +335,7 @@ function o:Watch(opts)
   os.execute(cmd)
 end
 
---- Example: `rsync -rt --delete --prune-empty-dirs --out-format=\ •\ %n\ =\>\ /Applications/wow/_classic_era_/Interface/AddOns/DevSuite/%n --exclude-from=./dev/rsync-excludes.txt`
+--- Example: `rsync -rt --delete --delete-excluded --prune-empty-dirs --out-format=\ •\ %n\ =\>\ /Applications/wow/_classic_era_/Interface/AddOns/DevSuite/%n --exclude-from=./dev/rsync-excludes.txt`
 --- @param opts DeployCLI_Options
 --- @param dest string
 --- @param shortArgs string
