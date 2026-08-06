@@ -11,7 +11,7 @@ local INVOKED_AS = os.getenv('INVOKED_AS')
 --[[-----------------------------------------------------------------------------
 Local Vars
 -------------------------------------------------------------------------------]]
-local RELEASE_SCRIPT      = './dev/release.sh'
+local RELEASE_SCRIPT      = 'release.sh'  -- release should be in the shell PATH
 local RELEASE_SCRIPT_ARGS = '-dz'
 local BUILD_DIR           = './.release'
 

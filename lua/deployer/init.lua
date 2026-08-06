@@ -74,7 +74,7 @@ local INVALID_CONFIG_MSG = '-c or --config requires a path to a deployer config;
 
 --- @param configPath string The deployer config file
 local function validateConfigPath(configPath)
-  assert(type(configPath) == 'string')
+  assert(type(configPath) == 'string', 'Invalid configPath: ' .. tostring(configPath))
   assert(not u:StartsWith(configPath, '--'), INVALID_CONFIG_MSG)
   assert(u:IsReadableFile(configPath), INVALID_FILE_MSGF:format(tostring(configPath)))
 end
